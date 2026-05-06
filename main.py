@@ -4,44 +4,44 @@ import os
 
 app = Flask(__name__)
 
-# Получаем токены из переменных окружения
+# Получаем токен из переменных окружения
 VK_GROUP_TOKEN = os.getenv('VK_GROUP_TOKEN')
 VK_CONFIRMATION_TOKEN = '56d9cc7e'  # Токен подтверждения из настроек ВК
-
 
 @app.route('/', methods=['GET', 'POST'])
 def vk_callback():
     if request.method == 'GET':
-        # Ответ для мониторинга Render
         return 'VK Bot is running and ready to receive messages', 200
 
     # Обработка POST‑запроса от VK Callback API
     data = request.json
+    print(f"Received data: {data}")  # Отладочная печать — поможет увидеть входящие данные
+
 
     # Обработка запроса на подтверждение сервера
     if data.get('type') == 'confirmation':
+        print("Confirmation request received")
         return VK_CONFIRMATION_TOKEN, 200
-
-    # Проверка секретного ключа (если используете)
-    # Если не используете секретный ключ, этот блок можно удалить
-    # if data.get('secret') != VK_SECRET_KEY:
-    #     print("Invalid secret key")
-    #     return 'error', 400
 
     # Обработка нового сообщения
     if data.get('type') == 'message_new':
-        object_data = data['object']['message']
-        user_id = object_data['from_id']
-        text = object_data.get('text', '').lower()
+        print("Message_new event detected")
 
-        # Проверка на ключевые слова приветствия
-        greetings = ['привет', 'здравствуйте', 'добрый день', 'хай', 'hello']
-        if any(greeting in text for greeting in greetings):
-            send_message(user_id, 'Здравствуйте! Чем могу помочь?')
+        # Безопасное извлечение данных
+        if 'object' in data and 'message' in data['object']:
+            message_data = data['object']['message']
+            user_id = message_data['from_id']
+            text = message_data.get('text', '').lower()
+            print(f"User {user_id} sent: {text}")
 
-        return 'ok'
+            # Отправляем ответ «Привет!» на ЛЮБОЕ сообщение
+            send_message(user_id, 'Привет!')
+            return 'ok', 200
+        else:
+            print("Invalid message structure")
+            return 'error', 400
 
-    return 'ok'
+    return 'ok', 200
 
 def send_message(user_id, message):
     """Отправка сообщения через VK API с обработкой ошибок"""
@@ -54,6 +54,7 @@ def send_message(user_id, message):
             'v': '5.131'
         }
         response = requests.post(url, params=params, timeout=10)
+        print(f"VK API response: {response.status_code}, {response.text}")  # Логирование ответа VK API
 
         if response.status_code != 200:
             print(f"Error sending message: {response.text}")
