@@ -6,23 +6,29 @@ app = Flask(__name__)
 
 # Получаем токены из переменных окружения
 VK_GROUP_TOKEN = os.getenv('VK_GROUP_TOKEN')
-VK_SECRET_KEY = os.getenv('VK_SECRET_KEY')
+VK_CONFIRMATION_TOKEN = '56d9cc7e'  # Токен подтверждения из настроек ВК
+
 
 @app.route('/', methods=['GET', 'POST'])
 def vk_callback():
     if request.method == 'GET':
-        # Ответ для мониторинга Render и проверки работоспособности
+        # Ответ для мониторинга Render
         return 'VK Bot is running and ready to receive messages', 200
 
     # Обработка POST‑запроса от VK Callback API
     data = request.json
 
-    # Проверка секретного ключа для безопасности
-    if data.get('secret') != VK_SECRET_KEY:
-        print("Invalid secret key")
-        return 'error', 400
+    # Обработка запроса на подтверждение сервера
+    if data.get('type') == 'confirmation':
+        return VK_CONFIRMATION_TOKEN, 200
 
-    # Обработка события нового сообщения
+    # Проверка секретного ключа (если используете)
+    # Если не используете секретный ключ, этот блок можно удалить
+    # if data.get('secret') != VK_SECRET_KEY:
+    #     print("Invalid secret key")
+    #     return 'error', 400
+
+    # Обработка нового сообщения
     if data.get('type') == 'message_new':
         object_data = data['object']['message']
         user_id = object_data['from_id']
