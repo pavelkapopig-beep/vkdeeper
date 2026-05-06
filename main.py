@@ -1,7 +1,7 @@
 import os
 import threading
 from flask import Flask
-from vk_api import VkApi
+import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.utils import get_random_id
 
