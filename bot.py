@@ -2,9 +2,11 @@ import os
 import logging
 import random
 import time
+import requests
 from dotenv import load_dotenv
 from vk_api import VkApi
 from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.upload import VkUpload
 from openai import OpenAI
 
 load_dotenv()
@@ -26,8 +28,8 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# ПРЯМЫЕ ССЫЛКИ НА КАРТИНКИ (IMGUR)
-IMAGES = {
+# Ссылки на картинки (Imgur)
+IMAGE_URLS = {
     "ask": "https://i.imgur.com/2h9vzFt.jpg",
     "start": "https://i.imgur.com/7Yy6LY8.jpg",
     "img1": "https://i.imgur.com/MoufF46.jpg",
@@ -38,6 +40,46 @@ IMAGES = {
     "error": "https://i.imgur.com/57Eo9et.jpg",
     "final": "https://i.imgur.com/7s33CuO.jpg"
 }
+
+# Словарь для хранения ID загруженных фото
+PHOTO_IDS = {}
+
+def upload_image_from_url(vk_session, url, key):
+    """Скачивает картинку по URL и загружает в ВК"""
+    global PHOTO_IDS
+    try:
+        # Скачиваем картинку
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            logging.error(f"Не удалось скачать {key}: статус {response.status_code}")
+            return False
+        
+        # Сохраняем временно
+        temp_file = f"/tmp/{key}.jpg"
+        with open(temp_file, 'wb') as f:
+            f.write(response.content)
+        
+        # Загружаем в ВК
+        upload = VkUpload(vk_session)
+        photo = upload.photo_messages(temp_file)
+        photo_id = f"photo{photo[0]['owner_id']}_{photo[0]['id']}"
+        PHOTO_IDS[key] = photo_id
+        
+        # Удаляем временный файл
+        os.remove(temp_file)
+        
+        logging.info(f"✅ Загружена картинка: {key} -> {photo_id}")
+        return True
+    except Exception as e:
+        logging.error(f"❌ Ошибка загрузки {key}: {e}")
+        return False
+
+def upload_all_images(vk_session):
+    """Загружает все картинки в ВК"""
+    logging.info("📸 Загружаю картинки в ВК...")
+    for key, url in IMAGE_URLS.items():
+        upload_image_from_url(vk_session, url, key)
+    logging.info(f"📸 Загружено картинок: {len(PHOTO_IDS)}")
 
 # Сценарий посвящения
 INITIATION_STEPS = [
@@ -80,12 +122,11 @@ SYSTEM_PROMPT = """Ты Сэр Исаак Ньютон. Тебе 60 лет. Ты
 После ругани всегда даёшь полезный ответ. Ты скряга, не любишь когда отвлекают."""
 
 def send_message(vk, user_id, text, image_key=None):
-    """Отправляет сообщение с картинкой"""
+    """Отправляет сообщение с картинкой (через attachment)"""
     attachment = ""
-    if image_key and image_key in IMAGES:
-        attachment = IMAGES[image_key]
+    if image_key and image_key in PHOTO_IDS:
+        attachment = PHOTO_IDS[image_key]
     
-    # ИСПРАВЛЕННЫЙ ВЫЗОВ - передаём параметры как словарь
     vk.messages.send(
         user_id=user_id,
         message=text,
@@ -116,6 +157,9 @@ def main():
     vk_session = VkApi(token=VK_TOKEN)
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
+    
+    # Загружаем картинки в ВК
+    upload_all_images(vk_session)
     
     user_states = {}
     user_histories = {}
