@@ -80,17 +80,18 @@ SYSTEM_PROMPT = """Ты Сэр Исаак Ньютон. Тебе 60 лет. Ты
 После ругани всегда даёшь полезный ответ. Ты скряга, не любишь когда отвлекают."""
 
 def send_message(vk, user_id, text, image_key=None):
-    """Отправляет сообщение с картинкой (ссылка на Imgur)"""
+    """Отправляет сообщение с картинкой"""
     attachment = ""
     if image_key and image_key in IMAGES:
         attachment = IMAGES[image_key]
     
-    vk.method('messages.send', {
-        'user_id': user_id,
-        'message': text,
-        'random_id': random.randint(1, 999999),
-        'attachment': attachment
-    })
+    # ИСПРАВЛЕННЫЙ ВЫЗОВ - передаём параметры как словарь
+    vk.messages.send(
+        user_id=user_id,
+        message=text,
+        random_id=random.randint(1, 999999),
+        attachment=attachment
+    )
 
 def get_deepseek_response(user_message, conversation_history):
     try:
@@ -121,7 +122,7 @@ def main():
     user_initiation_step = {}
 
     for event in longpoll.listen():
-        if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
+        if event.type == VkEventType.MESSAGE_NEW and event.to_me:
             user_message = event.text.strip().lower()
             user_id = event.user_id
             
@@ -189,7 +190,6 @@ def main():
                                 send_message(vk, user_id, next_step["text"], next_step["image"])
                             else:
                                 user_states[user_id] = "menu"
-                                vk.method('users.get', {'user_ids': user_id})
                                 name = f"id{user_id}"
                                 send_message(vk, user_id, 
                                     f"🎉 ПОЗДРАВЛЯЮ ТЕБЯ {name}! ТЫ ПРОШЁЛ ПОСВЯЩЕНИЕ! 🎉\n\n"
