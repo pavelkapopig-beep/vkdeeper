@@ -1,3 +1,4 @@
 vk-api
 python-dotenv
 openai
+requests
