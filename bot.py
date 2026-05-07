@@ -5,6 +5,7 @@ import time
 from dotenv import load_dotenv
 from vk_api import VkApi
 from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.upload import VkUpload
 from openai import OpenAI
 
 load_dotenv()
@@ -26,41 +27,60 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# ПРЯМЫЕ ССЫЛКИ НА КАРТИНКИ С GITHUB (НЕ СКАЧИВАЮТСЯ, А СРАЗУ ИСПОЛЬЗУЮТСЯ)
-GITHUB_IMAGES = "https://raw.githubusercontent.com/pavelkapopig-beep/vkdeeper/main/images/"
+# Папка с картинками на Bothost (укажите правильный путь)
+IMAGES_FOLDER = "/app/images/"  # ← ЭТОТ ПУТЬ МОЖЕТ ОТЛИЧАТЬСЯ
 
-IMAGES = {
-    "ask": f"{GITHUB_IMAGES}ask.jpg",
-    "start": f"{GITHUB_IMAGES}start.jpg",
-    "img1": f"{GITHUB_IMAGES}img1.jpg",
-    "img2": f"{GITHUB_IMAGES}img2.jpg",
-    "img3": f"{GITHUB_IMAGES}img3.jpg",
-    "img4": f"{GITHUB_IMAGES}img4.jpg",
-    "img5": f"{GITHUB_IMAGES}img5.jpg",
-    "error": f"{GITHUB_IMAGES}error.jpg",
-    "final": f"{GITHUB_IMAGES}final.jpg"
-}
+# ID загруженных картинок
+PHOTO_IDS = {}
+
+def upload_all_images(vk_session):
+    """Загружает все картинки из папки images в ВК"""
+    global PHOTO_IDS
+    upload = VkUpload(vk_session)
+    
+    # Список файлов для загрузки
+    images = {
+        "ask": "ask.jpg",
+        "start": "start.jpg",
+        "img1": "img1.jpg",
+        "img2": "img2.jpg",
+        "img3": "img3.jpg",
+        "img4": "img4.jpg",
+        "img5": "img5.jpg",
+        "error": "error.jpg",
+        "final": "final.jpg"
+    }
+    
+    logging.info("📸 Загружаю картинки в ВК...")
+    
+    for key, filename in images.items():
+        filepath = os.path.join(IMAGES_FOLDER, filename)
+        try:
+            if os.path.exists(filepath):
+                photo = upload.photo_messages(filepath)
+                photo_id = f"photo{photo[0]['owner_id']}_{photo[0]['id']}"
+                PHOTO_IDS[key] = photo_id
+                logging.info(f"✅ Загружена {key}: {photo_id}")
+            else:
+                logging.warning(f"⚠️ Файл не найден: {filepath}")
+        except Exception as e:
+            logging.error(f"❌ Ошибка загрузки {key}: {e}")
+    
+    logging.info(f"📸 Загружено {len(PHOTO_IDS)} из {len(images)} картинок")
 
 INITIATION_STEPS = [
     {"text": "😏 Приклони колено повторяй за мной!\nГовори когда надо КЛЯНУСЬ!", "image": "start", "need_confirm": False},
-    {"text": "Так клянемся же:\nНет предела Радиусу бесконечного чувства волнения сегодняшних виновников посвящения перед принятием клятвы.\n\nКлянемся пространством Минковского, что его четвертое измерение не властно над любовью к точным наукам\n\nКлянемся?", "image": "img1", "need_confirm": True},
-    {"text": "Клянемся псевдосферой Лобачевского, что главным орудием доказательства истины будет логика\nКлянемся смотреть в корень и глубоко проникать в сущность явлений, чтобы познать тонкость выбранных наук\n\nКлянемся?", "image": "img2", "need_confirm": True},
-    {"text": "Клянемся законами торсионных полей, что чувство привязанности к любимым предметам не будет обратно пропорционально расстоянию от первого знакомства с ними до перспективы взаимодействия!\n\nКлянемся, что вопреки теории относительности Эйнштейна, наше стремление к познанию будет постоянно и безотносительно\n\nКлянемся! жечь дотла свою жизнь младую на алтаре науки,\nДелать домашку! Не жалея собственных сил!\n\nКлянемся?", "image": "img3", "need_confirm": True},
-    {"text": "Свято помнить, что плоха та теория,\nЧто не подтверждается на практикуме!\n\nПравильно и своевременно интерпретировать любой график,\nНезависимо от того, какой стороной он повёрнут!\n\nКЛЯНЁМСЯ?", "image": "img4", "need_confirm": True},
-    {"text": "Не путать плюс с минусом, Ферма с Ферми,\nПланка с Капабланкой, закон Вина с сухим законом,\nБойля с Мариоттом и Ильина с Позняком!\n\nПолностью и без потерь собирать урожай с квантовых полей,\n\nКлянемся?", "image": "img5", "need_confirm": True}
+    {"text": "Так клянемся же:\nНет предела Радиусу...\n\nКлянемся пространством Минковского...\n\nКлянемся?", "image": "img1", "need_confirm": True},
+    {"text": "Клянемся псевдосферой Лобачевского...\n\nКлянемся?", "image": "img2", "need_confirm": True},
+    {"text": "Клянемся законами торсионных полей...\n\nКлянемся? жечь дотла...\n\nКлянемся?", "image": "img3", "need_confirm": True},
+    {"text": "Свято помнить, что плоха та теория...\n\nКЛЯНЁМСЯ?", "image": "img4", "need_confirm": True},
+    {"text": "Не путать плюс с минусом...\n\nКлянемся?", "image": "img5", "need_confirm": True}
 ]
 
-SYSTEM_PROMPT = """Ты Сэр Исаак Ньютон. Тебе 60 лет. Ты ворчливый скряга и безумный физик. Глава Секты Ньютона.
-
-Когда человек выбирает "поговорить" - ты общаешься как ворчливый старик-физик. Ругаешься физическими фразами: "Сила трения тебе в задницу!", "Закон сохранения энергии, блин!", "Ускорение свободного падения!", "Яблоко тебе на макушку!", "Момент инерции твоих мыслей стремится к нулю!"
-
-После ругани всегда даёшь полезный ответ. Ты скряга, не любишь когда отвлекают."""
+SYSTEM_PROMPT = """Ты Сэр Исаак Ньютон. Ворчливый скряга, безумный физик. Ругаешься: "Сила трения тебе в задницу!", "Закон сохранения энергии!", "Яблоко тебе на макушку!" После ругани даёшь ответ."""
 
 def send_message(vk, user_id, text, image_key=None):
-    attachment = ""
-    if image_key and image_key in IMAGES:
-        attachment = IMAGES[image_key]
-    
+    attachment = PHOTO_IDS.get(image_key, "") if image_key else ""
     vk.messages.send(
         user_id=user_id,
         message=text,
@@ -68,135 +88,97 @@ def send_message(vk, user_id, text, image_key=None):
         attachment=attachment
     )
 
-def get_deepseek_response(user_message, conversation_history):
+def get_deepseek_response(user_message, history):
     try:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages.extend(conversation_history)
-        messages.append({"role": "user", "content": user_message})
-        
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=messages,
-            max_tokens=800,
-            temperature=0.9
-        )
-        return response.choices[0].message.content
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": user_message}]
+        resp = client.chat.completions.create(model="deepseek-chat", messages=messages, max_tokens=800, temperature=0.9)
+        return resp.choices[0].message.content
     except Exception as e:
         logging.error(f"Ошибка DeepSeek: {e}")
-        return "Закон сохранения энергии, блин! Техника сломалась... Иди яблоко помой."
+        return "Закон сохранения энергии, блин! Техника сломалась..."
 
 def main():
-    logging.info("✅ Сэр Исаак Ньютон запущен! Картинки с GitHub")
+    logging.info("✅ Сэр Исаак Ньютон запущен!")
     
     vk_session = VkApi(token=VK_TOKEN)
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
     
-    user_states = {}
-    user_histories = {}
-    user_initiation_step = {}
+    # ЗАГРУЖАЕМ КАРТИНКИ ИЗ ПАПКИ
+    upload_all_images(vk_session)
+    
+    states, histories, init_step = {}, {}, {}
 
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-            user_message = event.text.strip().lower()
-            user_id = event.user_id
+            msg = event.text.strip().lower()
+            uid = event.user_id
+            logging.info(f"Сообщение от {uid}: {msg}")
             
-            logging.info(f"Сообщение от {user_id}: {user_message}")
-            
-            if user_id not in user_states:
-                user_states[user_id] = "menu"
-                send_message(vk, user_id, 
-                    "🧙‍♂️ Приветствую тебя, странник!\n\n"
-                    "Ты хочешь:\n"
-                    "1️⃣ Поговорить со стариком Ньютоном\n"
-                    "2️⃣ Пройти посвящение в Секту Ньютона\n\n"
-                    "Напиши 1 или 2", "ask")
+            if uid not in states:
+                states[uid] = "menu"
+                send_message(vk, uid, "🧙‍♂️ Приветствую!\n\n1️⃣ Поговорить\n2️⃣ Посвящение\n\nНапиши 1 или 2", "ask")
                 continue
             
-            if user_states[user_id] == "menu":
-                if user_message in ["1", "поговорить"]:
-                    user_states[user_id] = "chat"
-                    send_message(vk, user_id, 
-                        "Ох, силушка-то... Ладно, давай болтай. Только быстро!\n"
-                        "Что хотел сказать?")
-                    continue
-                elif user_message in ["2", "посвящение", "секта"]:
-                    user_states[user_id] = "initiation"
-                    user_initiation_step[user_id] = -1
-                    send_message(vk, user_id, 
-                        "Приветствую тебя странник! Готов произнести клятву и очистить свой ум и разум от ереси?\n\n"
-                        "Напиши ДА или НЕТ", "ask")
-                    continue
+            if states[uid] == "menu":
+                if msg in ["1", "поговорить"]:
+                    states[uid] = "chat"
+                    send_message(vk, uid, "Ох, давай болтай. Что хотел сказать?")
+                elif msg in ["2", "посвящение", "секта"]:
+                    states[uid] = "initiation"
+                    init_step[uid] = -1
+                    send_message(vk, uid, "Готов произнести клятву?\n\nНапиши ДА или НЕТ", "ask")
                 else:
-                    send_message(vk, user_id, 
-                        "Я тебя проклинаю, бес! Пиши 1 (поговорить) или 2 (посвящение)!")
-                    continue
+                    send_message(vk, uid, "Пиши 1 или 2!")
+                continue
             
-            if user_states[user_id] == "initiation":
-                step = user_initiation_step.get(user_id, -1)
-                
+            if states[uid] == "initiation":
+                step = init_step.get(uid, -1)
                 if step == -1:
-                    if user_message == "да":
-                        user_initiation_step[user_id] = 0
+                    if msg == "да":
+                        init_step[uid] = 0
                         step_data = INITIATION_STEPS[0]
-                        send_message(vk, user_id, step_data["text"], step_data["image"])
+                        send_message(vk, uid, step_data["text"], step_data["image"])
                         if not step_data["need_confirm"]:
                             time.sleep(1)
-                            user_initiation_step[user_id] = 1
-                            next_step = INITIATION_STEPS[1]
-                            send_message(vk, user_id, next_step["text"], next_step["image"])
-                    elif user_message == "нет":
-                        user_states[user_id] = "menu"
-                        send_message(vk, user_id, "Ну и проваливай, бес! Возвращаюсь в меню.", "error")
+                            init_step[uid] = 1
+                            send_message(vk, uid, INITIATION_STEPS[1]["text"], INITIATION_STEPS[1]["image"])
+                    elif msg == "нет":
+                        states[uid] = "menu"
+                        send_message(vk, uid, "Ну и проваливай, бес!", "error")
                     else:
-                        send_message(vk, user_id, 
-                            "Ты мне втираешь какую-то дичь\n\nЯ тебя проклинаю, бес!", "error")
+                        send_message(vk, uid, "Ты мне втираешь какую-то дичь!\nЯ тебя проклинаю, бес!", "error")
                     continue
                 
-                if step >= 0 and step < len(INITIATION_STEPS):
-                    current_step = INITIATION_STEPS[step]
-                    
-                    if current_step["need_confirm"]:
-                        if user_message == "клянусь":
-                            next_step_idx = step + 1
-                            if next_step_idx < len(INITIATION_STEPS):
-                                user_initiation_step[user_id] = next_step_idx
-                                next_step = INITIATION_STEPS[next_step_idx]
-                                send_message(vk, user_id, next_step["text"], next_step["image"])
+                if 0 <= step < len(INITIATION_STEPS):
+                    if INITIATION_STEPS[step]["need_confirm"]:
+                        if msg == "клянусь":
+                            nxt = step + 1
+                            if nxt < len(INITIATION_STEPS):
+                                init_step[uid] = nxt
+                                send_message(vk, uid, INITIATION_STEPS[nxt]["text"], INITIATION_STEPS[nxt]["image"])
                             else:
-                                user_states[user_id] = "chat"
-                                send_message(vk, user_id, 
-                                    f"🎉 ПОЗДРАВЛЯЮ! ТЫ ПРОШЁЛ ПОСВЯЩЕНИЕ! 🎉\n\n"
-                                    f"Теперь ты один из нас! С гордостью неси знамя физики и честь Секты Ньютона.\n\n"
-                                    f"А сейчас послушай гимн нашей секты:\n"
-                                    f"https://www.youtube.com/watch?v=UPSDSKaVXA8&feature=youtu.be\n\n"
-                                    f"И подпишись: https://t.me/SektaNewtona", "final")
+                                states[uid] = "chat"
+                                send_message(vk, uid, "🎉 ПОЗДРАВЛЯЮ! ТЫ ПРОШЁЛ ПОСВЯЩЕНИЕ! 🎉\n\nГимн: https://www.youtube.com/watch?v=UPSDSKaVXA8\nПодпишись: https://t.me/SektaNewtona", "final")
                         else:
-                            send_message(vk, user_id, 
-                                "Ты мне втираешь какую-то дичь\n\nЯ тебя проклинаю, бес!", "error")
+                            send_message(vk, uid, "Ты мне втираешь какую-то дичь!\nЯ тебя проклинаю, бес!", "error")
                     continue
             
-            if user_states[user_id] == "chat":
-                if user_message in ["меню", "стоп", "выйти"]:
-                    user_states[user_id] = "menu"
-                    send_message(vk, user_id, 
-                        "Возвращаемся в меню!\nНапиши 1 (поговорить) или 2 (посвящение)", "ask")
+            if states[uid] == "chat":
+                if msg in ["меню", "стоп", "выйти"]:
+                    states[uid] = "menu"
+                    send_message(vk, uid, "Возвращаю в меню! Напиши 1 или 2", "ask")
                     continue
                 
-                if user_id not in user_histories:
-                    user_histories[user_id] = []
-                
-                conversation_history = user_histories[user_id][-10:] if len(user_histories[user_id]) > 10 else user_histories[user_id]
-                answer = get_deepseek_response(user_message, conversation_history)
-                
-                user_histories[user_id].append({"role": "user", "content": user_message})
-                user_histories[user_id].append({"role": "assistant", "content": answer})
-                
-                if len(user_histories[user_id]) > 20:
-                    user_histories[user_id] = user_histories[user_id][-20:]
-                
-                send_message(vk, user_id, answer)
-                continue
+                if uid not in histories:
+                    histories[uid] = []
+                hist = histories[uid][-10:] if len(histories[uid]) > 10 else histories[uid]
+                answer = get_deepseek_response(msg, hist)
+                histories[uid].append({"role": "user", "content": msg})
+                histories[uid].append({"role": "assistant", "content": answer})
+                if len(histories[uid]) > 20:
+                    histories[uid] = histories[uid][-20:]
+                send_message(vk, uid, answer)
 
 if __name__ == '__main__':
     main()
