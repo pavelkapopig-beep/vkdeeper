@@ -26,7 +26,7 @@ client = OpenAI(
     base_url="https://api.deepseek.com"
 )
 
-# Ссылка на ваши картинки на GitHub (УЖЕ ИСПРАВЛЕНА)
+# ПРЯМЫЕ ССЫЛКИ НА КАРТИНКИ С GITHUB (НЕ СКАЧИВАЮТСЯ, А СРАЗУ ИСПОЛЬЗУЮТСЯ)
 GITHUB_IMAGES = "https://raw.githubusercontent.com/pavelkapopig-beep/vkdeeper/main/images/"
 
 IMAGES = {
